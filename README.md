@@ -1,3 +1,10 @@
+# MegaJam Project
+## Setup
+* Check out project
+* Get FMOD binaries from server: https://discord.com/channels/852980888396627988/1116532797075619951/1156128021594513539
+* Create Plugins folder in the repo root if it doesn't exist and extract FMOD there
+* Open UProject and build
+
 # ue5-gitignore
 
 A correct `git` setup example _with [`git-lfs`](https://git-lfs.github.com/)_ for Unreal Engine 5 (and 4) projects.
