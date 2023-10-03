@@ -28,6 +28,7 @@ protected:
 	// Called when the game starts
 
 	bool bWasShootingLastTick;
+	bool bIsDisabledBecauseJuggernaut;
 	float PeriodBetweenShots;
 
 	FVector_NetQuantize LastFiredPosition;
@@ -96,7 +97,7 @@ public:
 	bool bIsShooting;
 	UFUNCTION()
 	void OnRep_IsShooting();
-	
+
 	void HandleShootAction(const FInputActionValue& ActionValue);
 	virtual bool CanShoot(const float TimeStamp);
 	void StartShootingLocalOnly(const float TimeStamp);
@@ -122,6 +123,9 @@ public:
 	FShotFired ShotFired;
 	UPROPERTY(BlueprintAssignable)
 	FStoppedShooting StoppedShooting;
+
+	UFUNCTION(BlueprintCallable)
+	void OnCellPickedUp();
 	
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

@@ -61,9 +61,6 @@ void ASubmarinePlayerController::SetupInputComponent()
 	MapKey(PawnMappingContext, RotateAction, EKeys::Q, true, true, EInputAxisSwizzle::ZYX);
 	MapKey(PawnMappingContext, RotateAction, EKeys::E, false, true, EInputAxisSwizzle::ZYX);
 
-	// Dash
-	MapKey(PawnMappingContext, DashAction, EKeys::RightMouseButton);
-
 	// Gamepad setup
 	// Strafe movement
 	MapKey(PawnMappingContext, MoveAction, EKeys::Gamepad_LeftY);
@@ -83,6 +80,7 @@ void ASubmarinePlayerController::SetupInputComponent()
 
 	// Dash
 	MapKey(PawnMappingContext, DashAction, EKeys::Gamepad_FaceButton_Right);
+	MapKey(PawnMappingContext, DashAction, EKeys::RightMouseButton);
 
 	MapKey(PawnMappingContext, ShootPrimaryAction, EKeys::Gamepad_RightTrigger);
 	MapKey(PawnMappingContext, ShootPrimaryAction, EKeys::LeftMouseButton);

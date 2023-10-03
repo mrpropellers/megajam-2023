@@ -55,6 +55,7 @@ void USubmarineWeapon::BeginPlay()
 	// IMPORTANT: We don't support modifying BaseFireRate during play
 	PeriodBetweenShots = 1.f / BaseFireRate;
 	bWasShootingLastTick = false;
+	bIsDisabledBecauseJuggernaut = false;
 	// Initialize events to an arbitrary point in the past
 	TimeLastStoppedShooting = Now() - PeriodBetweenShots;
 	TimeLastFired = TimeLastStoppedShooting - PeriodBetweenShots;
@@ -88,6 +89,10 @@ void USubmarineWeapon::TickComponent(float DeltaTime, ELevelTick TickType,
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	const auto CurrentTime = Now();
+	if (bIsDisabledBecauseJuggernaut)
+	{
+		return;
+	}
 	// UE_LOG(LogTemp, Log, TEXT("Tick: %f"), CurrentTime)
 	if (bIsShooting && CanShoot(CurrentTime))
 	{
@@ -139,9 +144,22 @@ void USubmarineWeapon::BindToPlayer(
 // {
 // }
 
+void USubmarineWeapon::OnCellPickedUp()
+{
+	if (bIsShooting)
+	{
+		if (Instigator && Instigator->IsLocallyControlled())
+		{
+			StopShootingLocalOnly(Now());
+		}
+	}
+	bIsDisabledBecauseJuggernaut = true;
+}
+
+
 bool USubmarineWeapon::CanShoot(const float TimeStamp)
 {
-	return TimeStamp - TimeLastFired > PeriodBetweenShots;
+	return TimeStamp - TimeLastFired > PeriodBetweenShots && !bIsDisabledBecauseJuggernaut;
 }
 
 float USubmarineWeapon::Now() const
@@ -151,6 +169,10 @@ float USubmarineWeapon::Now() const
 
 void USubmarineWeapon::HandleShootAction(const FInputActionValue& ActionValue)
 {
+	if (bIsDisabledBecauseJuggernaut)
+	{
+		return;
+	}
 	const auto bIsShootAction = ActionValue.Get<bool>();
 	UE_LOG(LogTemp, Log, TEXT("Shoot button pressed."))
 	const auto TimeStamp = Now();

@@ -27,6 +27,7 @@ ASubmarinePawn::ASubmarinePawn()
 	MoveSensitivity = 1.0f;
 	RotateSensitivity = 50.0f;
 	JuggernautDashCooldown = 4.f;
+	JuggernautDashDuration = 1.5f;
 
 	bReplicates = true;
 	// We want to manually and explicitly update movement - so don't let any auto-replication happen
@@ -265,7 +266,8 @@ void ASubmarinePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	check(EnhancedInput && SubmarinePlayerController);
 	EnhancedInput->BindAction(SubmarinePlayerController->MoveAction, ETriggerEvent::Triggered, this, &ASubmarinePawn::Move);
 	EnhancedInput->BindAction(SubmarinePlayerController->RotateAction, ETriggerEvent::Triggered, this, &ASubmarinePawn::Rotate);
-	EnhancedInput->BindAction(SubmarinePlayerController->DashAction, ETriggerEvent::Started, this, &ASubmarinePawn::Dash);
+	EnhancedInput->BindAction(SubmarinePlayerController->DashAction, ETriggerEvent::Triggered, this, &ASubmarinePawn::Dash);
+	
 
 	if (!bWeaponsAreInitialized)
 	{
@@ -297,6 +299,10 @@ void ASubmarinePawn::InitializeWeapons()
 
 void ASubmarinePawn::Move(const FInputActionValue& ActionValue)
 {
+	if (bIsChargingJuggernautDash || (bIsJuggernaut && bIsDashing))
+	{
+		return;
+	}
 	LastKnownStrafeInput = ActionValue.Get<FInputActionValue::Axis3D>();
 	AddMovementInput(GetActorRotation().RotateVector(LastKnownStrafeInput), MoveSensitivity);
 }
@@ -304,8 +310,14 @@ void ASubmarinePawn::Move(const FInputActionValue& ActionValue)
 
 void ASubmarinePawn::Rotate(const FInputActionValue& ActionValue)
 {
+	// Ignore rotate if we're in the middle of a Juggernaut dash
+	if (bIsJuggernaut && bIsDashing && !bIsChargingJuggernautDash)
+	{
+		return;
+	}
 	FRotator Input(ActionValue[0], ActionValue[1], ActionValue[2]);
-	Input *= GetWorld()->GetDeltaSeconds() * RotateSensitivity;
+	const float Sensitivity = bIsChargingJuggernautDash ? RotateSensitivity / 10.f : RotateSensitivity;
+	Input *= GetWorld()->GetDeltaSeconds() * Sensitivity;
 	AddActorLocalRotation(Input);
 
 	if (!FMath::IsNearlyZero(Input.Roll))
@@ -315,16 +327,21 @@ void ASubmarinePawn::Rotate(const FInputActionValue& ActionValue)
 	
 }
 
-void ASubmarinePawn::OnCellPickup()
+void ASubmarinePawn::OnRep_Juggernaut()
 {
-	CellPickedUp.Broadcast(this);
-	bIsJuggernaut = true;
+	if (!bIsJuggernaut)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Called OnRep_Juggernaut even though we're not!"))
+		return;
+	}
+	CellPickedUp.Broadcast();
 	CurrentDashCooldown = JuggernautDashCooldown;
 }
 
 bool ASubmarinePawn::CanDash()
 {
-	return !bIsDashing && UGameplayStatics::GetTimeSeconds(GetWorld()) - TimeLastDashFinished > CurrentDashCooldown;
+	return !bIsDashing &&
+		UGameplayStatics::GetTimeSeconds(GetWorld()) - TimeLastDashFinished > CurrentDashCooldown;
 }
 
 bool ASubmarinePawn::IsRolling()
@@ -335,6 +352,16 @@ bool ASubmarinePawn::IsRolling()
 
 void ASubmarinePawn::Dash(const FInputActionValue& ActionValue)
 {
+	if (bIsJuggernaut)
+	{
+		JuggernautDash(ActionValue);
+		return;
+	}
+	// Check whether this action was Started or Ended (we trigger on Start for normal dash)
+	if (!ActionValue.Get<bool>())
+	{
+		return;
+	}
 	if (!CanDash())
 	{
 		UE_LOG(LogTemp, Log, TEXT("In Dash cooldown; can't dash."))
@@ -356,6 +383,71 @@ void ASubmarinePawn::Dash(const FInputActionValue& ActionValue)
 	// NOTE: This will only broadcast locally since the Dash logic only executes locally
 	DashStarted.Broadcast();
 }
+
+void ASubmarinePawn::JuggernautDash(const FInputActionValue& ActionValue)
+{
+	const bool bIsButtonPressed = ActionValue.Get<bool>();
+	if (bIsButtonPressed && CanDash())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Charging up Juggernaut Dash"));
+		bIsDashing = true;
+		bIsChargingJuggernautDash = true;
+		TimeJuggernautDashChargingStarted = GetWorld()->GetTimeSeconds();
+	}
+	else if (!bIsButtonPressed) 
+	{
+		if (CanDash() || !bIsChargingJuggernautDash)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Got a Dash Completed event but Pawn can still dash???"))
+			return;
+		}
+		const float ValidChargeThreshold = JuggernautDashChargeDuration * 0.25f;
+		const float ChargeWaitThreshold = JuggernautDashChargeDuration * 0.5f;
+		const float TimeSpentCharging = GetWorld()->GetTimeSeconds() - TimeJuggernautDashChargingStarted;
+		if (TimeSpentCharging < ValidChargeThreshold)
+		{
+			UE_LOG(LogTemp, Log, TEXT("Juggernaut Dash cancelled"));
+			bIsDashing = false;
+			bIsChargingJuggernautDash = false;
+		}
+		else if (TimeSpentCharging < ChargeWaitThreshold)
+		{
+			const float RemainingWaitTime = ChargeWaitThreshold - TimeSpentCharging;
+			UE_LOG(LogTemp, Log, TEXT("Juggernaut Dash locked in, will execute in %f seconds"), RemainingWaitTime);
+			GetWorld()->GetTimerManager().SetTimer(
+				DashEndTimerHandle, this, &ASubmarinePawn::DoJuggernautDash, RemainingWaitTime, false);
+		}
+		else
+		{
+			DoJuggernautDash();
+		}
+	}
+}
+
+void ASubmarinePawn::DoJuggernautDash()
+{
+	UE_LOG(LogTemp, Log, TEXT("Doing Juggernaut Dash"));
+	bIsChargingJuggernautDash = false;
+
+	const float ChargeRatio = (GetWorld()->GetTimeSeconds() - TimeJuggernautDashChargingStarted) / JuggernautDashChargeDuration;
+
+	DefaultAcceleration = Movement->Acceleration;
+	DefaultMaxSpeed = Movement->MaxSpeed;
+	Movement->MaxSpeed = JuggernautDashSpeed;
+	Movement->Acceleration = JuggernautDashSpeed * 10.f;
+
+	Movement->Velocity = GetActorForwardVector() * JuggernautDashSpeed;
+	DefaultDeceleration = Movement->Deceleration;
+	Movement->Deceleration = 0.f;
+
+
+	GetWorld()->GetTimerManager().SetTimer(
+		DashEndTimerHandle, this, &ASubmarinePawn::EndDash, ChargeRatio * JuggernautDashDuration, false);
+	// NOTE: This will only broadcast locally since the Dash logic only executes locally
+	DashStarted.Broadcast();
+	
+}
+
 
 void ASubmarinePawn::EndDash()
 {

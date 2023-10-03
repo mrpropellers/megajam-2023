@@ -9,8 +9,7 @@ class USubmarineWeapon;
 struct FInputActionValue;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FStartedDash);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
-	FCellPickedUp, class ASubmarinePawn*, ThisSubmarine);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCellPickedUp);
 
 UCLASS()
 class ANTIQUATEDFUTURE_API ASubmarinePawn : public APawn
@@ -22,6 +21,7 @@ protected:
 	const float ExtrapolationLimit = 0.1f;
 	bool bHasWarnedAuthority;
 	bool bWeaponsAreInitialized;
+	bool bIsChargingJuggernautDash;
 	float LastTimestampApplied;
 
 	FString NetDebugName;
@@ -72,7 +72,8 @@ public:
 	void Move(const FInputActionValue& ActionValue);
 	void Rotate(const FInputActionValue& ActionValue);
 	void Dash(const FInputActionValue& ActionValue);
-
+	void JuggernautDash(const FInputActionValue& ActionValue);
+	void DoJuggernautDash();
 	void EndDash();
 
 	
@@ -85,7 +86,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	class UFloatingPawnMovement* Movement;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_Juggernaut)
 	bool bIsJuggernaut;
 	UPROPERTY(EditAnywhere)
 	float JuggernautDashCooldown;
@@ -101,18 +102,26 @@ public:
 	float RollCooldown;;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float DashSpeed = 3000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float JuggernautDashSpeed = 6000.0f;
 	UPROPERTY(EditAnywhere)
 	float DashSlowdown = 4000.0f;
 	UPROPERTY(EditAnywhere)
 	float DashDuration = 0.75f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float JuggernautDashChargeDuration = 2.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float JuggernautDashDuration;
+	UPROPERTY(BlueprintReadOnly)
+	float TimeJuggernautDashChargingStarted;
 
 	UPROPERTY(BlueprintAssignable)
 	FStartedDash DashStarted;
 	UPROPERTY(BlueprintAssignable)
 	FCellPickedUp CellPickedUp;
 
-	UFUNCTION(BlueprintCallable)
-	void OnCellPickup();
+	UFUNCTION()
+	void OnRep_Juggernaut();
 
 protected:
 	float CurrentDashCooldown;
