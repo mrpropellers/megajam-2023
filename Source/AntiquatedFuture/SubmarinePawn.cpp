@@ -65,6 +65,8 @@ void ASubmarinePawn::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & Ou
 
 	//DOREPLIFETIME(ASubmarinePawn, bHasReceivedMovement);
 	DOREPLIFETIME_CONDITION(ASubmarinePawn, ServerMovement, COND_SkipOwner);
+	// We'll manually invoke the local state changes - we trust our clients (: )
+	DOREPLIFETIME(ASubmarinePawn, bIsJuggernaut);
 }
 
 // Called when the game starts
@@ -202,6 +204,7 @@ void ASubmarinePawn::ServerSetTransform_Implementation(
 void ASubmarinePawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
 	if (!bWeaponsAreInitialized)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Weapons failed to initialize in SetupPlayerInputComponent or BeginPlay."
@@ -299,7 +302,7 @@ void ASubmarinePawn::InitializeWeapons()
 
 void ASubmarinePawn::Move(const FInputActionValue& ActionValue)
 {
-	if (bIsChargingJuggernautDash || (bIsJuggernaut && bIsDashing))
+	if (bIsChargingSuperDash || (bIsJuggernaut && bIsDashing))
 	{
 		return;
 	}
@@ -311,12 +314,13 @@ void ASubmarinePawn::Move(const FInputActionValue& ActionValue)
 void ASubmarinePawn::Rotate(const FInputActionValue& ActionValue)
 {
 	// Ignore rotate if we're in the middle of a Juggernaut dash
-	if (bIsJuggernaut && bIsDashing && !bIsChargingJuggernautDash)
+	if (bIsJuggernaut && bIsDashing)
 	{
 		return;
 	}
 	FRotator Input(ActionValue[0], ActionValue[1], ActionValue[2]);
-	const float Sensitivity = bIsChargingJuggernautDash ? RotateSensitivity / 10.f : RotateSensitivity;
+	// TODO: We should really just be clamping sensitivity to a predetermined max
+	const float Sensitivity = bIsChargingSuperDash ? RotateSensitivity / 4.f : RotateSensitivity;
 	Input *= GetWorld()->GetDeltaSeconds() * Sensitivity;
 	AddActorLocalRotation(Input);
 
@@ -327,20 +331,36 @@ void ASubmarinePawn::Rotate(const FInputActionValue& ActionValue)
 	
 }
 
+void ASubmarinePawn::SetAsJuggernaut()
+{
+	bIsJuggernaut = true;
+	if (IsLocallyControlled())
+	{
+		OnRep_Juggernaut();
+	}
+}
+
 void ASubmarinePawn::OnRep_Juggernaut()
 {
-	if (!bIsJuggernaut)
+	if (bIsJuggernaut)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s is now the Juggernaut!"), *GetActorNameOrLabel())
+	}
+	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Called OnRep_Juggernaut even though we're not!"))
 		return;
 	}
-	CellPickedUp.Broadcast();
 	CurrentDashCooldown = JuggernautDashCooldown;
+	for (const auto& Weapon: Weapons)
+	{
+		Weapon->OnBecomeJuggernaut();
+	}
 }
 
 bool ASubmarinePawn::CanDash()
 {
-	return !bIsDashing &&
+	return !(bIsDashing || bIsChargingSuperDash) &&
 		UGameplayStatics::GetTimeSeconds(GetWorld()) - TimeLastDashFinished > CurrentDashCooldown;
 }
 
@@ -390,13 +410,12 @@ void ASubmarinePawn::JuggernautDash(const FInputActionValue& ActionValue)
 	if (bIsButtonPressed && CanDash())
 	{
 		UE_LOG(LogTemp, Log, TEXT("Charging up Juggernaut Dash"));
-		bIsDashing = true;
-		bIsChargingJuggernautDash = true;
+		bIsChargingSuperDash = true;
 		TimeJuggernautDashChargingStarted = GetWorld()->GetTimeSeconds();
 	}
 	else if (!bIsButtonPressed) 
 	{
-		if (CanDash() || !bIsChargingJuggernautDash)
+		if (CanDash() || !bIsChargingSuperDash)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Got a Dash Completed event but Pawn can still dash???"))
 			return;
@@ -408,7 +427,7 @@ void ASubmarinePawn::JuggernautDash(const FInputActionValue& ActionValue)
 		{
 			UE_LOG(LogTemp, Log, TEXT("Juggernaut Dash cancelled"));
 			bIsDashing = false;
-			bIsChargingJuggernautDash = false;
+			bIsChargingSuperDash = false;
 		}
 		else if (TimeSpentCharging < ChargeWaitThreshold)
 		{
@@ -427,7 +446,8 @@ void ASubmarinePawn::JuggernautDash(const FInputActionValue& ActionValue)
 void ASubmarinePawn::DoJuggernautDash()
 {
 	UE_LOG(LogTemp, Log, TEXT("Doing Juggernaut Dash"));
-	bIsChargingJuggernautDash = false;
+	bIsChargingSuperDash = false;
+	bIsDashing = true;
 
 	const float ChargeRatio = (GetWorld()->GetTimeSeconds() - TimeJuggernautDashChargingStarted) / JuggernautDashChargeDuration;
 

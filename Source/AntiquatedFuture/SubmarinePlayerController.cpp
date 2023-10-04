@@ -42,6 +42,15 @@ void ASubmarinePlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
+	if (PawnMappingContext == nullptr)
+	{
+		// This is likely to happen when hot reload breaks our Blueprint class
+		UE_LOG(LogTemp, Warning, TEXT("Attempting to set up Input without first constructing the mapping context! "
+								"Constructing it now."))
+		PawnMappingContext = NewObject<UInputMappingContext>(this);
+		
+	}
+
 	// Keyboard setup
 	// Strafe movement
 	MapKey(PawnMappingContext, MoveAction, EKeys::W);

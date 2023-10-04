@@ -23,6 +23,7 @@ class ANTIQUATEDFUTURE_API USubmarineGameInstance : public UGameInstance
 
 	const FString LogInType = "accountportal";
 	const FString SearchKeyword = "SubmarineTest";
+	const FName SettingKeyLobbyName = "SubmarineLobbyName";
 	const FName TestSessionName = FName("Submarine Session");
 	
 protected:

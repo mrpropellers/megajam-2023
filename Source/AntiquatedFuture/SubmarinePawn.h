@@ -9,7 +9,6 @@ class USubmarineWeapon;
 struct FInputActionValue;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FStartedDash);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCellPickedUp);
 
 UCLASS()
 class ANTIQUATEDFUTURE_API ASubmarinePawn : public APawn
@@ -21,7 +20,6 @@ protected:
 	const float ExtrapolationLimit = 0.1f;
 	bool bHasWarnedAuthority;
 	bool bWeaponsAreInitialized;
-	bool bIsChargingJuggernautDash;
 	float LastTimestampApplied;
 
 	FString NetDebugName;
@@ -57,6 +55,8 @@ public:
 	
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsDashing;
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsChargingSuperDash;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_Move)
 	FRepFloatingMovement ServerMovement;
@@ -86,7 +86,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	class UFloatingPawnMovement* Movement;
 
-	UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_Juggernaut)
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Juggernaut)
 	bool bIsJuggernaut;
 	UPROPERTY(EditAnywhere)
 	float JuggernautDashCooldown;
@@ -117,8 +117,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FStartedDash DashStarted;
-	UPROPERTY(BlueprintAssignable)
-	FCellPickedUp CellPickedUp;
+
+	UFUNCTION(BlueprintCallable)
+	void SetAsJuggernaut();
 
 	UFUNCTION()
 	void OnRep_Juggernaut();

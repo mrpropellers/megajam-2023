@@ -124,8 +124,7 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FStoppedShooting StoppedShooting;
 
-	UFUNCTION(BlueprintCallable)
-	void OnCellPickedUp();
+	void OnBecomeJuggernaut();
 	
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

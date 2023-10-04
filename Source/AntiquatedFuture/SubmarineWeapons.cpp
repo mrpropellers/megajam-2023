@@ -144,7 +144,7 @@ void USubmarineWeapon::BindToPlayer(
 // {
 // }
 
-void USubmarineWeapon::OnCellPickedUp()
+void USubmarineWeapon::OnBecomeJuggernaut()
 {
 	if (bIsShooting)
 	{
@@ -174,7 +174,7 @@ void USubmarineWeapon::HandleShootAction(const FInputActionValue& ActionValue)
 		return;
 	}
 	const auto bIsShootAction = ActionValue.Get<bool>();
-	UE_LOG(LogTemp, Log, TEXT("Shoot button pressed."))
+	//UE_LOG(LogTemp, Log, TEXT("Shoot button pressed."))
 	const auto TimeStamp = Now();
 	if (bIsShootAction)
 	{
@@ -254,7 +254,7 @@ void USubmarineWeapon::ServerStartShooting_Implementation(const float TimeStamp,
 	}
 	else
 	{
-		UE_LOG(LogTemp, Log, TEXT("Server starting to shoot."))
+		//UE_LOG(LogTemp, Log, TEXT("Server starting to shoot."))
 	}
 	bIsShooting = true;
 
@@ -266,7 +266,7 @@ void USubmarineWeapon::ServerStopShooting_Implementation(const float TimeStamp)
 {
 	if (bIsShooting)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Server stopping shooting."))
+		//UE_LOG(LogTemp, Log, TEXT("Server stopping shooting."))
 	}
 	else
 	{

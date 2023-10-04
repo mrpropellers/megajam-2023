@@ -211,6 +211,9 @@ void USubmarineGameInstance::CreateSession(const FString& SessionName)
 	{
 		if (const IOnlineSessionPtr Session = OnlineSubsystem->GetSessionInterface())
 		{
+			// Settings.Set(SEARCH_KEYWORDS, SearchKeyword, EOnlineDataAdvertisementType::ViaOnlineService);
+			const FString ResolvedName = SessionName.Equals("")
+				? "SubmarineGame" : SessionName;
 			auto Settings = FOnlineSessionSettings();
 			Settings.bIsDedicated = false;
 			Settings.bShouldAdvertise = bAdvertise;
@@ -221,12 +224,14 @@ void USubmarineGameInstance::CreateSession(const FString& SessionName)
 			Settings.bUsesPresence = bUsePresence;
 			Settings.bUseLobbiesVoiceChatIfAvailable = false;
 			Settings.bUseLobbiesIfAvailable = bUseLobbies;
+			const auto NameId = Settings.GetID(SettingKeyLobbyName);
+			Settings.Set(SettingKeyLobbyName, FOnlineSessionSetting(
+				ResolvedName,
+				EOnlineDataAdvertisementType::ViaOnlineServiceAndPing, NameId));
+			
 
-			// Settings.Set(SEARCH_KEYWORDS, SearchKeyword, EOnlineDataAdvertisementType::ViaOnlineService);
-			const FName ResolvedName = SessionName.Equals("")
-				? FName("SubmarineGame") : FName("Submarine" + SessionName);
 			Session->OnCreateSessionCompleteDelegates.AddUObject(this, &USubmarineGameInstance::OnCreateSessionComplete);
-			Session->CreateSession(0, ResolvedName, Settings);
+			Session->CreateSession(0, FName(ResolvedName), Settings);
 		}
 		else
 		{
@@ -308,11 +313,12 @@ TArray<FSubmarineSession> USubmarineGameInstance::GetSearchResults()
 		// 	SubmarineSession.Name = NamedSession->SessionName.ToString();
 		// }
 		// else
+		
+		if(!SearchResult.Session.SessionSettings.Get(SettingKeyLobbyName, SubmarineSession.Name))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Failed to fetch Session name."))
-			SubmarineSession.Name = SearchResult.GetSessionIdStr();
 		}
-		SubmarineSession.NumPlayers = 12 - SearchResult.Session.NumOpenPrivateConnections;
+		SubmarineSession.NumPlayers = 12 - SearchResult.Session.NumOpenPublicConnections;
 		SubmarineSession.ListIndex = i;
 		Results.Add(SubmarineSession);
 	}
